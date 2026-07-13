@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-beige-light: #FDFBF7;
+  --color-beige: #F5F5DC;
+  --color-beige-dark: #E8E5BA;
+  --color-blanc-casse: #FAF9F6;
+  --color-gold: #D4AF37;
+  --color-gold-dark: #AA8C2C;
+  --color-charcoal: #333333;
+
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+}
+
+@layer base {
+  body {
+    @apply bg-blanc-casse font-sans text-charcoal antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-white/50 shadow-lg rounded-xl;
+  }
+
+  .btn-primary {
+    @apply bg-charcoal text-blanc-casse px-5 py-2.5 rounded-lg hover:bg-black transition-all duration-300 hover:shadow-md active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply bg-beige-dark text-charcoal px-5 py-2.5 rounded-lg hover:bg-gold hover:text-white transition-all duration-300 hover:shadow-md active:scale-[0.98];
+  }
+
+  .btn-gold {
+    @apply bg-gold-dark text-white px-5 py-2.5 rounded-lg hover:bg-gold transition-all duration-300 hover:shadow-md active:scale-[0.98];
+  }
+
+  .input-field {
+    @apply w-full border border-beige-dark/60 rounded-lg px-4 py-2.5 outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all duration-200 bg-white/80;
+  }
+
+  .nav-tab {
+    @apply block w-full text-left px-4 py-2.5 rounded-lg text-charcoal hover:bg-beige-light transition-all duration-200;
+  }
+
+  .nav-tab-active {
+    @apply bg-beige-light text-gold-dark font-medium border-l-4 border-gold;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
