@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(cuid())
+  name             String
+  email            String   @unique
+  password         String
+  role             String   @default("patient") // 'doctor', 'secretary', 'patient'
+  phone            String?
+  address          String?
+  birthDate        String?
+  bloodType        String?
+  allergies        String?
+  antecedents      String?
+  medications      String?
+  emergencyContact String?
+  emergencyPhone   String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  patientsCreated  Patient[]      @relation("PatientCreator")
+  apptsCreated     Appointment[]  @relation("AppointmentCreator")
+  prescrCreated    Prescription[] @relation("PrescriptionCreator")
+}
+
+model Patient {
+  id               String   @id @default(cuid())
+  name             String
+  email            String   @unique
+  phone            String
+  birthDate        String
+  address          String
+  emergencyContact String?
+  emergencyPhone   String?
+  allergies        String?
+  antecedents      String?
+  medications      String?
+  bloodType        String?
+  
+  createdBy        String   // Remove the ? to make it required
+  creator          User     @relation("PatientCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  // Remove the ? from creator and onDelete: SetNull → Cascade
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  appointments     Appointment[]
+  documents        Document[]
+  messages         Message[]
+  prescriptions    Prescription[]
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientName String
+  date        String
+  time        String
+  service     String
+  status      String   @default("pending") // 'pending', 'confirmed', 'cancelled', 'completed'
+  notes       String?
+  
+  createdBy   String?
+  creator     User?    @relation("AppointmentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  name       String
+  type       String   @default("upload") // 'prescription', 'quote', 'analysis', 'upload'
+  fileUrl    String?
+  uploadedBy String   @default("doctor") // 'doctor', 'secretary', 'patient'
+  date       String
+  createdAt  DateTime @default(now())
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  sender    String   // 'patient', 'doctor', 'secretary'
+  text      String
+  read      Boolean  @default(false)
+  timestamp DateTime @default(now())
+}
+
+model Prescription {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientName String
+  notes       String
+  date        String
+  
+  createdBy   String?
+  creator     User?    @relation("PrescriptionCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+}
+
+model Schedule {
+  id        String   @id @default(cuid())
+  day       String   @unique // 'monday', 'tuesday', etc.
+  enabled   Boolean  @default(true)
+  slots     String[]
+  updatedAt DateTime @updatedAt
+}
+
