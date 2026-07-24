@@ -1,21 +1,315 @@
 const express = require('express');
-const {
-  getPatients,
-  getPatient,
-  createPatient,
-  updatePatient,
-  deletePatient
-} = require('../controllers/patientController');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 const { auth, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
+// ─── ALL ROUTES REQUIRE AUTHENTICATION ──────────────────────────────────────
 router.use(auth);
 
-router.get('/', getPatients);
-router.get('/:id', getPatient);
-router.post('/', createPatient);
-router.put('/:id', updatePatient);
-router.delete('/:id', authorize('secretary'), deletePatient);
+// ─── GET ALL PATIENTS ──────────────────────────────────────────────────────
+router.get('/', async (req, res) => {
+  try {
+    console.log('📥 Fetching all patients...');
+    const patients = await prisma.patient.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    console.log(`✅ Found ${patients.length} patients`);
+    res.json({
+      success: true,
+      count: patients.length,
+      data: patients
+    });
+  } catch (error) {
+    console.error('❌ Error fetching patients:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ─── GET PATIENT PROFILE ──────────────────────────────────────────────────
+router.get('/profile', async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const patient = await prisma.patient.findUnique({
+      where: { email: user.email }
+    });
+
+    res.json({
+      success: true,
+      data: patient || {
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        birthDate: user.birthDate || null,
+        address: user.address || null,
+        bloodType: user.bloodType || null,
+        allergies: user.allergies || null,
+        antecedents: user.antecedents || null,
+        medications: user.medications || null,
+        emergencyContact: user.emergencyContact || null,
+        emergencyPhone: user.emergencyPhone || null,
+      }
+    });
+  } catch (error) {
+    console.error('Get patient profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ─── UPDATE PATIENT PROFILE ────────────────────────────────────────────────
+router.put('/profile', async (req, res) => {
+  try {
+    const userId = req.userId;
+    const {
+      name, email, phone, birthDate, address,
+      emergencyContact, emergencyPhone,
+      allergies, antecedents, medications, bloodType
+    } = req.body;
+
+    // Update user
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        email,
+        phone,
+        birthDate: birthDate || null,
+        address: address || null,
+        bloodType: bloodType || null,
+        allergies: allergies || null,
+        antecedents: antecedents || null,
+        medications: medications || null,
+        emergencyContact: emergencyContact || null,
+        emergencyPhone: emergencyPhone || null,
+      }
+    });
+
+    // Update or create patient
+    const patient = await prisma.patient.upsert({
+      where: { email: email },
+      update: {
+        name,
+        email,
+        phone,
+        birthDate: birthDate || null,
+        address: address || null,
+        bloodType: bloodType || null,
+        allergies: allergies || null,
+        antecedents: antecedents || null,
+        medications: medications || null,
+        emergencyContact: emergencyContact || null,
+        emergencyPhone: emergencyPhone || null,
+      },
+      create: {
+        name,
+        email,
+        phone: phone || '',
+        birthDate: birthDate || null,
+        address: address || null,
+        bloodType: bloodType || null,
+        allergies: allergies || null,
+        antecedents: antecedents || null,
+        medications: medications || null,
+        emergencyContact: emergencyContact || null,
+        emergencyPhone: emergencyPhone || null,
+        createdBy: userId
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: patient
+    });
+  } catch (error) {
+    console.error('Update patient profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ─── GET SINGLE PATIENT ──────────────────────────────────────────────────
+router.get('/:id', async (req, res) => {
+  try {
+    const patient = await prisma.patient.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: patient
+    });
+  } catch (error) {
+    console.error('Error fetching patient:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ─── CREATE PATIENT (FIXED) ──────────────────────────────────────────────
+router.post('/', async (req, res) => {
+  try {
+    const { name, email, phone, birthDate, address } = req.body;
+
+    console.log('📝 Creating patient with data:', req.body);
+
+    // Validate required fields
+    if (!name || name.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Le nom du patient est requis'
+      });
+    }
+
+    // Generate a unique email if not provided
+    let patientEmail = email;
+    if (!patientEmail || patientEmail.trim() === '') {
+      const baseEmail = name.replace(/\s/g, '').toLowerCase();
+      patientEmail = `${baseEmail}${Date.now()}@email.com`;
+      console.log('📧 Generated email:', patientEmail);
+    }
+
+    // Check if patient already exists by email
+    const existing = await prisma.patient.findUnique({
+      where: { email: patientEmail }
+    });
+
+    if (existing) {
+      console.log('⚠️ Patient already exists with email:', patientEmail);
+      return res.status(409).json({
+        success: false,
+        message: 'Un patient avec cet email existe déjà',
+        existingPatient: existing
+      });
+    }
+
+    // Create patient
+    const patient = await prisma.patient.create({
+      data: {
+        name: name.trim(),
+        email: patientEmail,
+        phone: phone || '',
+        birthDate: birthDate || null,
+        address: address || null,
+        createdBy: req.userId
+      }
+    });
+
+    console.log('✅ Patient created:', patient);
+    res.status(201).json({
+      success: true,
+      data: patient
+    });
+  } catch (error) {
+    console.error('❌ Error creating patient:', error);
+
+    // Handle Prisma unique constraint error
+    if (error.code === 'P2002') {
+      return res.status(409).json({
+        success: false,
+        message: 'Un patient avec cet email existe déjà'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ─── UPDATE PATIENT ──────────────────────────────────────────────────────
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, phone, birthDate, address, allergies, antecedents, medications, bloodType, emergencyContact, emergencyPhone } = req.body;
+
+    const patient = await prisma.patient.update({
+      where: { id },
+      data: {
+        name,
+        email,
+        phone,
+        birthDate: birthDate || null,
+        address: address || null,
+        allergies: allergies || null,
+        antecedents: antecedents || null,
+        medications: medications || null,
+        bloodType: bloodType || null,
+        emergencyContact: emergencyContact || null,
+        emergencyPhone: emergencyPhone || null,
+      }
+    });
+
+    res.json({
+      success: true,
+      data: patient
+    });
+  } catch (error) {
+    console.error('Error updating patient:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ─── DELETE PATIENT ──────────────────────────────────────────────────────
+router.delete('/:id', authorize('secretary', 'doctor'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // First delete all appointments linked to this patient
+    await prisma.appointment.deleteMany({
+      where: { patientId: id }
+    });
+
+    // Then delete the patient
+    await prisma.patient.delete({
+      where: { id }
+    });
+
+    res.json({
+      success: true,
+      message: 'Patient and related appointments deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting patient:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 
 module.exports = router;

@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma');
+const realtimeService = require('../services/realtimeService');
 
 const getDocuments = async (req, res) => {
   try {
@@ -36,6 +37,8 @@ const createDocument = async (req, res) => {
       }
     });
 
+    realtimeService.broadcast('document_created', document);
+
     res.status(201).json({ success: true, data: document });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -53,6 +56,8 @@ const deleteDocument = async (req, res) => {
     }
 
     await prisma.document.delete({ where: { id: req.params.id } });
+
+    realtimeService.broadcast('document_deleted', { id: req.params.id, patientId: document.patientId });
 
     res.json({ success: true, message: 'Document deleted successfully' });
   } catch (error) {

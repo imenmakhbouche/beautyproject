@@ -17,6 +17,9 @@ const documentRoutes = require('./src/routes/documents');
 const prescriptionRoutes = require('./src/routes/prescriptions');
 const messageRoutes = require('./src/routes/messages');
 const scheduleRoutes = require('./src/routes/schedule');
+const notificationRoutes = require('./src/routes/notifications'); // ✅ ADD THIS
+const { auth } = require('./src/middleware/auth');
+const realtimeService = require('./src/services/realtimeService');
 
 const app = express();
 
@@ -36,6 +39,12 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/schedule', scheduleRoutes);
+app.use('/api/notifications', notificationRoutes); // ✅ ADD THIS
+
+// SSE Realtime Endpoint
+app.get('/api/realtime', auth, (req, res) => {
+  realtimeService.register(req, res);
+});
 
 // Health check
 app.get('/api/health', (req, res) => {

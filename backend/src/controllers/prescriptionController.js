@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma');
+const realtimeService = require('../services/realtimeService');
 
 const getPrescriptions = async (req, res) => {
   try {
@@ -34,6 +35,8 @@ const createPrescription = async (req, res) => {
         createdBy: req.userId
       }
     });
+
+    realtimeService.broadcast('prescription_created', prescription);
 
     res.status(201).json({ success: true, data: prescription });
   } catch (error) {

@@ -1,11 +1,16 @@
 const prisma = require('../config/prisma');
+const realtimeService = require('../services/realtimeService');
 
 const getMessages = async (req, res) => {
   try {
     const { patientId } = req.params;
+    const filter = {};
+    if (patientId && patientId !== 'all') {
+      filter.patientId = patientId;
+    }
 
     const messages = await prisma.message.findMany({
-      where: { patientId },
+      where: filter,
       orderBy: { timestamp: 'asc' }
     });
 
@@ -27,6 +32,8 @@ const sendMessage = async (req, res) => {
       data: { patientId, sender, text }
     });
 
+    realtimeService.broadcast('message_sent', message);
+
     res.status(201).json({ success: true, data: message });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -39,6 +46,8 @@ const markAsRead = async (req, res) => {
       where: { id: req.params.id },
       data: { read: true }
     });
+
+    realtimeService.broadcast('message_updated', message);
 
     res.json({ success: true, data: message });
   } catch (error) {
