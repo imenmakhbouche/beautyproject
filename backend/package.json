@@ -11,17 +11,26 @@
     "db:setup": "prisma db push && prisma generate"
   },
   "nodemonConfig": {
-    "watch": ["src", "server.js", "node_modules/@prisma/client"],
+    "watch": [
+      "src",
+      "server.js",
+      "node_modules/@prisma/client"
+    ],
     "ext": "js,json",
-    "ignore": ["node_modules/@prisma/client/runtime"]
+    "ignore": [
+      "node_modules/@prisma/client/runtime"
+    ]
   },
   "dependencies": {
     "@prisma/client": "^5.10.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "express": "^4.18.3",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.22.0",
+    "socket.io": "^4.7.0",
+    "socket.io-client": "^4.7.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",
