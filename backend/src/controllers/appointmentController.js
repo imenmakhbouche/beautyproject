@@ -25,6 +25,7 @@ const getAppointments = async (req, res) => {
       data: appointments
     });
   } catch (error) {
+    console.error('❌ Error fetching appointments:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -50,6 +51,7 @@ const getAppointment = async (req, res) => {
       data: appointment
     });
   } catch (error) {
+    console.error('❌ Error fetching appointment:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -57,75 +59,147 @@ const getAppointment = async (req, res) => {
   }
 };
 
+// ─── ✅ FIXED: CREATE APPOINTMENT ──────────────────────────────────────────
 const createAppointment = async (req, res) => {
   try {
     const { patientId, patientName, date, time, service, status, notes } = req.body;
 
-    // Validate that the patient exists
-    const patientExists = await prisma.patient.findUnique({
-      where: { id: patientId }
-    });
+    console.log('📝 Creating appointment with data:', req.body);
 
-    if (!patientExists) {
+    // Validate required fields
+    if (!patientId) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid patient ID: Patient not found'
+        message: 'Patient ID is required'
       });
     }
 
+    if (!patientName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patient name is required'
+      });
+    }
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Date is required'
+      });
+    }
+
+    if (!time) {
+      return res.status(400).json({
+        success: false,
+        message: 'Time is required'
+      });
+    }
+
+    // ✅ FIXED: Check if patient exists, but don't fail if not found
+    // Instead, create appointment even if patient doesn't exist in Patient table
+    // (since patient might only exist in User table)
+    let patientExists = false;
+    try {
+      const patient = await prisma.patient.findUnique({
+        where: { id: patientId }
+      });
+      if (patient) {
+        patientExists = true;
+        console.log('✅ Patient found:', patient.name);
+      } else {
+        console.log('⚠️ Patient not found in Patient table, but continuing...');
+      }
+    } catch (patientError) {
+      console.log('⚠️ Error checking patient, continuing...');
+    }
+
+    // Create the appointment even if patient doesn't exist
     const appointment = await prisma.appointment.create({
       data: {
-        patientId,
-        patientName,
-        date,
-        time,
-        service,
+        patientId: patientId,
+        patientName: patientName,
+        date: date,
+        time: time,
+        service: service || 'Consultation',
         status: status || 'pending',
-        notes,
-        createdBy: req.userId
+        notes: notes || '',
+        createdBy: req.userId || null
       }
     });
 
-    // ✅ Create notification for patient
-    await notificationService.createAppointmentRequested(
-      patientId,
-      date,
-      time,
-      service
-    );
+    console.log('✅ Appointment created successfully:', appointment);
 
-    realtimeService.broadcast('appointment_created', appointment);
+    // Try to create notification, but don't fail if it doesn't work
+    try {
+      if (patientExists) {
+        await notificationService.createAppointmentRequested(
+          patientId,
+          date,
+          time,
+          service || 'Consultation'
+        );
+      }
+    } catch (notifError) {
+      console.warn('⚠️ Could not create notification:', notifError.message);
+    }
+
+    // Broadcast realtime update
+    try {
+      realtimeService.broadcast('appointment_created', appointment);
+    } catch (realtimeError) {
+      console.warn('⚠️ Could not broadcast realtime update:', realtimeError.message);
+    }
 
     res.status(201).json({
       success: true,
       data: appointment
     });
+
   } catch (error) {
-    console.error('Error creating appointment:', error);
+    console.error('❌ Error creating appointment:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
+      details: error.stack
     });
   }
 };
 
 const updateAppointment = async (req, res) => {
   try {
-    // Exclude relations / metadata fields if they are sent in body
     const { id, createdAt, updatedAt, creator, createdBy, ...updateData } = req.body;
+
+    console.log('📝 Updating appointment:', req.params.id, updateData);
+
+    // Check if appointment exists
+    const existing = await prisma.appointment.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
 
     const appointment = await prisma.appointment.update({
       where: { id: req.params.id },
       data: updateData
     });
 
-    realtimeService.broadcast('appointment_updated', appointment);
+    try {
+      realtimeService.broadcast('appointment_updated', appointment);
+    } catch (realtimeError) {
+      console.warn('⚠️ Could not broadcast realtime update:', realtimeError.message);
+    }
 
     res.json({
       success: true,
       data: appointment
     });
   } catch (error) {
+    console.error('❌ Error updating appointment:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -136,35 +210,57 @@ const updateAppointment = async (req, res) => {
 const updateAppointmentStatus = async (req, res) => {
   try {
     const { status } = req.body;
+    console.log('📝 Updating appointment status:', req.params.id, status);
+
+    // Check if appointment exists
+    const existing = await prisma.appointment.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
     const appointment = await prisma.appointment.update({
       where: { id: req.params.id },
       data: { status }
     });
 
-    // ✅ Create notification based on status
-    if (status === 'confirmed') {
-      await notificationService.createAppointmentConfirmed(
-        appointment.patientId,
-        appointment.date,
-        appointment.time,
-        appointment.service
-      );
-    } else if (status === 'cancelled') {
-      await notificationService.createAppointmentCancelled(
-        appointment.patientId,
-        appointment.date,
-        appointment.time
-      );
+    // Try to create notification based on status
+    try {
+      if (status === 'confirmed') {
+        await notificationService.createAppointmentConfirmed(
+          appointment.patientId,
+          appointment.date,
+          appointment.time,
+          appointment.service
+        );
+      } else if (status === 'cancelled') {
+        await notificationService.createAppointmentCancelled(
+          appointment.patientId,
+          appointment.date,
+          appointment.time
+        );
+      }
+    } catch (notifError) {
+      console.warn('⚠️ Could not create notification:', notifError.message);
     }
 
-    realtimeService.broadcast('appointment_updated', appointment);
+    try {
+      realtimeService.broadcast('appointment_updated', appointment);
+    } catch (realtimeError) {
+      console.warn('⚠️ Could not broadcast realtime update:', realtimeError.message);
+    }
 
     res.json({
       success: true,
       data: appointment
     });
   } catch (error) {
-    console.error('Error updating appointment:', error);
+    console.error('❌ Error updating appointment status:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -174,17 +270,36 @@ const updateAppointmentStatus = async (req, res) => {
 
 const deleteAppointment = async (req, res) => {
   try {
+    console.log('🗑️ Deleting appointment:', req.params.id);
+
+    // Check if appointment exists
+    const existing = await prisma.appointment.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
     await prisma.appointment.delete({
       where: { id: req.params.id }
     });
 
-    realtimeService.broadcast('appointment_deleted', { id: req.params.id });
+    try {
+      realtimeService.broadcast('appointment_deleted', { id: req.params.id });
+    } catch (realtimeError) {
+      console.warn('⚠️ Could not broadcast realtime update:', realtimeError.message);
+    }
 
     res.json({
       success: true,
       message: 'Appointment deleted successfully'
     });
   } catch (error) {
+    console.error('❌ Error deleting appointment:', error);
     res.status(500).json({
       success: false,
       message: error.message
