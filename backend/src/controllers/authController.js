@@ -1,7 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma'); // ✅ Use shared singleton — avoids multiple client conflicts
 
 // Register function - Updated to handle ALL patient fields
 const register = async (req, res) => {

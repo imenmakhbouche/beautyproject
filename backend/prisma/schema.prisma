@@ -87,6 +87,7 @@ model Document {
   fileUrl    String?
   uploadedBy String   @default("doctor") // 'doctor', 'secretary', 'patient'
   date       String
+  content    String?
   createdAt  DateTime @default(now())
 }
 

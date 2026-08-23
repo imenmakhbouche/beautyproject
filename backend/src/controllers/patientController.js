@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma'); // ✅ Use shared singleton — avoids multiple client conflicts
 
 // ─── GET ALL PATIENTS ─────────────────────────────────────────────────────
 const getPatients = async (req, res) => {

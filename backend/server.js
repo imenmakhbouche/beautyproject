@@ -8,6 +8,16 @@ const { Server } = require('socket.io');
 // Load environment variables FIRST
 dotenv.config();
 
+// Auto-generate Prisma client on startup to apply the new schema
+const { exec } = require('child_process');
+exec('npx prisma generate', (error, stdout, stderr) => {
+  if (error) {
+    console.error(`❌ Error generating Prisma: ${error.message}`);
+    return;
+  }
+  console.log(`✅ Prisma generated successfully!`);
+});
+
 // Import Prisma client
 const prisma = require('./src/config/prisma');
 

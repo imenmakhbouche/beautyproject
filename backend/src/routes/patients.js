@@ -1,6 +1,5 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma'); // ✅ Use shared singleton
 const { auth, authorize } = require('../middleware/auth');
 
 const router = express.Router();

@@ -24,7 +24,7 @@ const getDocuments = async (req, res) => {
 
 const createDocument = async (req, res) => {
   try {
-    const { patientId, name, type, fileUrl, uploadedBy, date } = req.body;
+    const { patientId, name, type, fileUrl, uploadedBy, date, content } = req.body;
 
     const document = await prisma.document.create({
       data: {
@@ -33,7 +33,8 @@ const createDocument = async (req, res) => {
         type: type || 'upload',
         fileUrl,
         uploadedBy: uploadedBy || 'doctor',
-        date: date || new Date().toISOString().split('T')[0]
+        date: date || new Date().toISOString().split('T')[0],
+        content
       }
     });
 

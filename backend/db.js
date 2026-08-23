@@ -18,7 +18,7 @@ const pool = new Pool({
     keepAliveInitialDelayMillis: 10000
 });
 
-// Test connection immediately
+// Test connection immediately and check/run database migration
 pool.query('SELECT NOW()', (err, res) => {
     if (err) {
         console.error('❌ Connection error:', err.message);
@@ -26,6 +26,15 @@ pool.query('SELECT NOW()', (err, res) => {
     } else {
         console.log('✅ Connected to Neon!');
         console.log('📅 Server time:', res.rows[0].now);
+        
+        // Add content column if it doesn't exist
+        pool.query('ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "content" TEXT;', (migrationErr, migrationRes) => {
+            if (migrationErr) {
+                console.error('❌ Migration failed to add "content" column to "Document":', migrationErr.message);
+            } else {
+                console.log('✅ Checked database schema: "content" column verified/added on "Document" table.');
+            }
+        });
     }
 });
 

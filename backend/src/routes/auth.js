@@ -1,8 +1,7 @@
 const express = require('express');
 const { register, login, getMe, completePatientRegistration } = require('../controllers/authController');
 const { auth } = require('../middleware/auth');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma'); // ✅ Use shared singleton
 
 const router = express.Router();
 

@@ -59,7 +59,6 @@ const getAppointment = async (req, res) => {
   }
 };
 
-// ─── ✅ FIXED: CREATE APPOINTMENT ──────────────────────────────────────────
 const createAppointment = async (req, res) => {
   try {
     const { patientId, patientName, date, time, service, status, notes } = req.body;
@@ -68,77 +67,45 @@ const createAppointment = async (req, res) => {
 
     // Validate required fields
     if (!patientId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Patient ID is required'
-      });
+      return res.status(400).json({ success: false, message: 'Patient ID is required' });
     }
-
     if (!patientName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Patient name is required'
-      });
+      return res.status(400).json({ success: false, message: 'Patient name is required' });
     }
-
     if (!date) {
-      return res.status(400).json({
-        success: false,
-        message: 'Date is required'
-      });
+      return res.status(400).json({ success: false, message: 'Date is required' });
     }
-
     if (!time) {
-      return res.status(400).json({
-        success: false,
-        message: 'Time is required'
-      });
+      return res.status(400).json({ success: false, message: 'Time is required' });
     }
 
-    // ✅ FIXED: Check if patient exists, but don't fail if not found
-    // Instead, create appointment even if patient doesn't exist in Patient table
-    // (since patient might only exist in User table)
-    let patientExists = false;
-    try {
-      const patient = await prisma.patient.findUnique({
-        where: { id: patientId }
-      });
-      if (patient) {
-        patientExists = true;
-        console.log('✅ Patient found:', patient.name);
-      } else {
-        console.log('⚠️ Patient not found in Patient table, but continuing...');
-      }
-    } catch (patientError) {
-      console.log('⚠️ Error checking patient, continuing...');
-    }
+    // Safely extract creator ID from middleware
+    const creatorId = req.userId || req.user?.id || null;
 
-    // Create the appointment even if patient doesn't exist
+    // Create the appointment
     const appointment = await prisma.appointment.create({
       data: {
-        patientId: patientId,
-        patientName: patientName,
-        date: date,
-        time: time,
+        patientId: String(patientId),
+        patientName: String(patientName),
+        date: date, // If Prisma expects DateTime, change to: new Date(date)
+        time: String(time),
         service: service || 'Consultation',
         status: status || 'pending',
         notes: notes || '',
-        createdBy: req.userId || null
+        createdBy: creatorId
       }
     });
 
     console.log('✅ Appointment created successfully:', appointment);
 
-    // Try to create notification, but don't fail if it doesn't work
+    // Try to create notification without throwing error if it fails
     try {
-      if (patientExists) {
-        await notificationService.createAppointmentRequested(
-          patientId,
-          date,
-          time,
-          service || 'Consultation'
-        );
-      }
+      await notificationService.createAppointmentRequested(
+        String(patientId),
+        date,
+        time,
+        service || 'Consultation'
+      );
     } catch (notifError) {
       console.warn('⚠️ Could not create notification:', notifError.message);
     }
@@ -150,17 +117,17 @@ const createAppointment = async (req, res) => {
       console.warn('⚠️ Could not broadcast realtime update:', realtimeError.message);
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: appointment
     });
 
   } catch (error) {
     console.error('❌ Error creating appointment:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
-      details: error.stack
+      code: error.code || null
     });
   }
 };

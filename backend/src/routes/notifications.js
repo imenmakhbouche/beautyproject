@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../config/prisma'); // ✅ Use shared singleton
 const realtimeService = require('../services/realtimeService');
-const prisma = new PrismaClient();
 
 // Get all notifications for a patient
 router.get('/patient/:patientId', auth, async (req, res) => {
