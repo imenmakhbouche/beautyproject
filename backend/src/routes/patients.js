@@ -317,9 +317,11 @@ router.post('/', async (req, res) => {
         name: name.trim(),
         email: patientEmail,
         phone: phone || '',
-        birthDate: birthDate || null,
-        address: address || null,
-        createdBy: req.userId
+        birthDate: birthDate || '',
+        address: address || '',
+        creator: {
+          connect: { id: req.userId }
+        }
       }
     });
 

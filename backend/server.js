@@ -9,14 +9,8 @@ const { Server } = require('socket.io');
 dotenv.config();
 
 // Auto-generate Prisma client on startup to apply the new schema
-const { exec } = require('child_process');
-exec('npx prisma generate', (error, stdout, stderr) => {
-  if (error) {
-    console.error(`❌ Error generating Prisma: ${error.message}`);
-    return;
-  }
-  console.log(`✅ Prisma generated successfully!`);
-});
+// Prisma client should be generated manually during development to avoid file-lock issues
+// Run `npx prisma generate` once after schema changes (we do this in CI or manually).
 
 // Import Prisma client
 const prisma = require('./src/config/prisma');
@@ -49,8 +43,16 @@ const io = new Server(server, {
 const connectedUsers = new Map(); // userId -> socketId
 
 // ─── MIDDLEWARE ────────────────────────────────────────────────────────────
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());

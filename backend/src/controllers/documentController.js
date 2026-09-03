@@ -24,12 +24,18 @@ const getDocuments = async (req, res) => {
 
 const createDocument = async (req, res) => {
   try {
-    const { patientId, name, type, fileUrl, uploadedBy, date, content } = req.body;
+    const { patientId, name, type, uploadedBy, date, content } = req.body;
+
+    // If multer stored a file, build a public fileUrl
+    let fileUrl = req.body.fileUrl || null;
+    if (req.file) {
+      fileUrl = `/uploads/${req.file.filename}`;
+    }
 
     const document = await prisma.document.create({
       data: {
         patientId,
-        name,
+        name: name || (req.file ? req.file.originalname : 'file'),
         type: type || 'upload',
         fileUrl,
         uploadedBy: uploadedBy || 'doctor',
